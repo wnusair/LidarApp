@@ -10,6 +10,11 @@ def create_app(config_name='default'):
     """Create and configure the Flask application."""
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    
+    # SECURITY: Validate configuration
+    config_class = config[config_name]
+    if hasattr(config_class, 'init_app'):
+        config_class.init_app(app)
 
     # Initialize extensions
     db.init_app(app)

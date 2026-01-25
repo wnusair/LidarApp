@@ -1,6 +1,7 @@
 # MTI (Miami Telemetry Interface) - Requirements
 # Flask and Core Dependencies
 Flask==3.0.0
+python-dotenv==1.0.0
 Flask-SQLAlchemy==3.1.1
 Flask-Login==0.6.3
 Flask-Migrate==4.0.5

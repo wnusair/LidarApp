@@ -16,6 +16,10 @@ import sys
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 from app import create_app, db
 from app.models import User, Role, RolePermission, DEFAULT_PERMISSIONS
 
@@ -71,6 +75,9 @@ def seed_permissions():
 
 def seed_admin():
     """Create the default admin user with Manager role."""
+    import secrets
+    import string
+    
     manager_role = Role.query.filter_by(name='Manager').first()
     if manager_role is None:
         print("  ERROR: Manager role not found. Run seed_roles first.")
@@ -78,11 +85,17 @@ def seed_admin():
     
     admin = User.query.filter_by(username='admin').first()
     if admin is None:
+        # Generate a secure random password
+        alphabet = string.ascii_letters + string.digits + '!@#$%^&*'
+        secure_password = ''.join(secrets.choice(alphabet) for _ in range(16))
+        
         admin = User(username='admin', role_id=manager_role.id)
-        admin.set_password('admin123')
+        admin.set_password(secure_password)
         db.session.add(admin)
         db.session.commit()
-        print("  Created admin user (username: admin, password: admin123)")
+        print("  Created admin user (username: admin)")
+        print(f"  Generated secure password: {secure_password}")
+        print("  IMPORTANT: Save this password now! It will not be shown again.")
         return admin
     else:
         print("  Admin user already exists")
@@ -90,15 +103,21 @@ def seed_admin():
 
 
 def seed_demo_users():
-    """Create demo users for each role."""
+    """Create demo users for each role with secure random passwords."""
+    import secrets
+    import string
+    
     demo_users = [
-        ('engineer1', 'engineer123', 'Engineer'),
-        ('operator1', 'operator123', 'Operator'),
-        ('investor1', 'investor123', 'Investor'),
-        ('auditor1', 'auditor123', 'Audit'),
+        ('engineer1', 'Engineer'),
+        ('operator1', 'Operator'),
+        ('investor1', 'Investor'),
+        ('auditor1', 'Audit'),
     ]
     
-    for username, password, role_name in demo_users:
+    generated_credentials = []
+    alphabet = string.ascii_letters + string.digits + '!@#$%^&*'
+    
+    for username, role_name in demo_users:
         role = Role.query.filter_by(name=role_name).first()
         if role is None:
             print(f"  ERROR: Role '{role_name}' not found")
@@ -106,14 +125,23 @@ def seed_demo_users():
         
         user = User.query.filter_by(username=username).first()
         if user is None:
+            # Generate secure random password
+            secure_password = ''.join(secrets.choice(alphabet) for _ in range(16))
             user = User(username=username, role_id=role.id)
-            user.set_password(password)
+            user.set_password(secure_password)
             db.session.add(user)
+            generated_credentials.append((username, role_name, secure_password))
             print(f"  Created user: {username} ({role_name})")
         else:
             print(f"  User exists: {username}")
     
     db.session.commit()
+    
+    # Display generated credentials
+    if generated_credentials:
+        print("\n  Generated credentials (SAVE THESE NOW):")
+        for username, role_name, password in generated_credentials:
+            print(f"    {username} ({role_name}): {password}")
 
 
 def main():
@@ -149,12 +177,9 @@ def main():
         print("\n" + "=" * 60)
         print("Database seeding complete!")
         print("=" * 60)
-        print("\nDefault credentials:")
-        print("  Admin:    admin / admin123")
-        print("  Engineer: engineer1 / engineer123")
-        print("  Operator: operator1 / operator123")
-        print("  Investor: investor1 / investor123")
-        print("  Auditor:  auditor1 / auditor123")
+        print("\nNOTE: All passwords are randomly generated at creation time.")
+        print("Check the output above for generated credentials.")
+        print("IMPORTANT: Save passwords immediately - they won't be shown again!")
         print("\nDefault permissions (most restrictive to least):")
         print("  Investor: Panels 1-2 only, no export")
         print("  Audit:    Panels 1-3, export + access logs")
