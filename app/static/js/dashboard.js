@@ -19,7 +19,6 @@ const COLORS = {
 
 // Chart instances
 let liveChart = null;
-let healthChart = null;
 let diskChart = null;
 
 // Camera state
@@ -110,35 +109,6 @@ function initializeWebSocket() {
                 });
                 liveChart.update('none');
             }
-
-            if (healthChart) {
-                const bgColors = Array.isArray(healthChart.data.datasets[0].backgroundColor)
-                    ? healthChart.data.datasets[0].backgroundColor
-                    : [];
-                const bdColors = Array.isArray(healthChart.data.datasets[0].borderColor)
-                    ? healthChart.data.datasets[0].borderColor
-                    : [];
-
-                data.readings.forEach(function(reading) {
-                    const color = reading.status === 'OK' ? COLORS.success
-                        : reading.status === 'WARNING' ? COLORS.warning
-                        : COLORS.miamiRed;
-                    const idx = healthChart.data.labels.indexOf(reading.sensor_name);
-                    if (idx >= 0) {
-                        healthChart.data.datasets[0].data[idx] = reading.value;
-                        bgColors[idx] = color;
-                        bdColors[idx] = color;
-                    } else {
-                        healthChart.data.labels.push(reading.sensor_name);
-                        healthChart.data.datasets[0].data.push(reading.value);
-                        bgColors.push(color);
-                        bdColors.push(color);
-                    }
-                });
-                healthChart.data.datasets[0].backgroundColor = bgColors;
-                healthChart.data.datasets[0].borderColor = bdColors;
-                healthChart.update('none');
-            }
         });
     }
 }
@@ -149,8 +119,8 @@ function initializeWebSocket() {
 function handlePanelUpdate(data) {
     if (data.panel_id === 'sensor_data') {
         loadSensorData();
-    } else if (data.panel_id === 'device_health') {
-        loadDeviceHealth();
+    } else if (data.panel_id === 'disk_usage') {
+        loadDiskUsage();
     }
 }
 
@@ -435,47 +405,6 @@ function initializeCharts() {
             }
         });
     }
-
-    // Device Health Chart
-    const healthChartCanvas = document.getElementById('healthChart');
-    if (healthChartCanvas) {
-        const ctx = healthChartCanvas.getContext('2d');
-        healthChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Latest Value',
-                    data: [],
-                    backgroundColor: COLORS.miamiRed,
-                    borderColor: COLORS.miamiRed,
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        grid: {
-                            color: COLORS.lightGray
-                        },
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
 }
 
 /**
@@ -486,7 +415,6 @@ async function loadAllData() {
         loadSensorData(),
         loadKPIs(),
         loadHistoricalLogs(),
-        loadDeviceHealth(),
         loadDiskUsage()
     ]);
 }
@@ -624,38 +552,6 @@ async function loadHistoricalLogs() {
         
     } catch (error) {
         console.error('Error loading historical logs:', error);
-    }
-}
-
-/**
- * Load device health data for the bar chart
- */
-async function loadDeviceHealth() {
-    if (!healthChart) return;
-    
-    try {
-        const response = await fetch('/api/sensor-data/latest');
-        const data = await response.json();
-        
-        if (data.length === 0) {
-            return;
-        }
-        
-        const labels = data.map(d => d.sensor_name);
-        const values = data.map(d => d.value);
-        const colors = data.map(d => 
-            d.status === 'OK' ? COLORS.success : 
-            d.status === 'WARNING' ? COLORS.warning : COLORS.miamiRed
-        );
-        
-        healthChart.data.labels = labels;
-        healthChart.data.datasets[0].data = values;
-        healthChart.data.datasets[0].backgroundColor = colors;
-        healthChart.data.datasets[0].borderColor = colors;
-        healthChart.update('none');
-        
-    } catch (error) {
-        console.error('Error loading device health:', error);
     }
 }
 

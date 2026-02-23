@@ -15,7 +15,7 @@ class RolePermission(db.Model):
     can_view_panel_1 = db.Column(db.Boolean, default=True)   # Live Sensor Feed
     can_view_panel_2 = db.Column(db.Boolean, default=True)   # Current Status/KPIs
     can_view_panel_3 = db.Column(db.Boolean, default=False)  # Historical Logs
-    can_view_panel_4 = db.Column(db.Boolean, default=False)  # Device Health
+    can_view_panel_4 = db.Column(db.Boolean, default=False)  # Storage Monitor
     
     can_view_panel_5 = db.Column(db.Boolean, default=False)  # Storage Monitor
 
@@ -38,7 +38,6 @@ class RolePermission(db.Model):
             'can_view_panel_2': self.can_view_panel_2,
             'can_view_panel_3': self.can_view_panel_3,
             'can_view_panel_4': self.can_view_panel_4,
-            'can_view_panel_5': self.can_view_panel_5,
             'can_export_data': self.can_export_data,
             'can_edit_data': self.can_edit_data,
             'can_manage_users': self.can_manage_users,
@@ -53,7 +52,6 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_2': True,   # KPIs
         'can_view_panel_3': False,
         'can_view_panel_4': False,
-        'can_view_panel_5': False,  # Storage Monitor
         'can_export_data': False,
         'can_edit_data': False,
         'can_manage_users': False,
@@ -64,7 +62,6 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_2': True,
         'can_view_panel_3': True,   # Can see logs
         'can_view_panel_4': False,
-        'can_view_panel_5': True,   # Storage visibility for auditing
         'can_export_data': True,    # Can export for auditing
         'can_edit_data': False,
         'can_manage_users': False,
@@ -75,7 +72,6 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_2': True,
         'can_view_panel_3': True,
         'can_view_panel_4': True,
-        'can_view_panel_5': True,
         'can_export_data': False,
         'can_edit_data': False,
         'can_manage_users': False,
@@ -86,7 +82,6 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_2': True,
         'can_view_panel_3': True,
         'can_view_panel_4': True,
-        'can_view_panel_5': True,
         'can_export_data': True,
         'can_edit_data': True,
         'can_manage_users': False,
@@ -97,7 +92,6 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_2': True,
         'can_view_panel_3': True,
         'can_view_panel_4': True,
-        'can_view_panel_5': True,
         'can_export_data': True,
         'can_edit_data': True,
         'can_manage_users': True,

@@ -19,7 +19,6 @@ def grid_view():
         'panel_2': current_user.can_view_panel(2),
         'panel_3': current_user.can_view_panel(3),
         'panel_4': current_user.can_view_panel(4),
-        'panel_5': current_user.can_view_panel(5),
     }
     
     return render_template(
