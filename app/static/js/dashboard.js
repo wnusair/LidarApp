@@ -19,7 +19,7 @@ const COLORS = {
 
 // Chart instances
 let liveChart = null;
-let diskChart = null;
+let healthChart = null;
 
 // Camera state
 let cameraStream = null;
@@ -29,7 +29,7 @@ let isCameraActive = false;
 let socket = null;
 
 // Update interval (milliseconds)
-const UPDATE_INTERVAL = 5000;
+const UPDATE_INTERVAL = 50;
 
 /**
  * Initialize the dashboard on page load
@@ -109,6 +109,35 @@ function initializeWebSocket() {
                 });
                 liveChart.update('none');
             }
+
+            if (healthChart) {
+                const bgColors = Array.isArray(healthChart.data.datasets[0].backgroundColor)
+                    ? healthChart.data.datasets[0].backgroundColor
+                    : [];
+                const bdColors = Array.isArray(healthChart.data.datasets[0].borderColor)
+                    ? healthChart.data.datasets[0].borderColor
+                    : [];
+
+                data.readings.forEach(function(reading) {
+                    const color = reading.status === 'OK' ? COLORS.success
+                        : reading.status === 'WARNING' ? COLORS.warning
+                        : COLORS.miamiRed;
+                    const idx = healthChart.data.labels.indexOf(reading.sensor_name);
+                    if (idx >= 0) {
+                        healthChart.data.datasets[0].data[idx] = reading.value;
+                        bgColors[idx] = color;
+                        bdColors[idx] = color;
+                    } else {
+                        healthChart.data.labels.push(reading.sensor_name);
+                        healthChart.data.datasets[0].data.push(reading.value);
+                        bgColors.push(color);
+                        bdColors.push(color);
+                    }
+                });
+                healthChart.data.datasets[0].backgroundColor = bgColors;
+                healthChart.data.datasets[0].borderColor = bdColors;
+                healthChart.update('none');
+            }
         });
     }
 }
@@ -119,8 +148,8 @@ function initializeWebSocket() {
 function handlePanelUpdate(data) {
     if (data.panel_id === 'sensor_data') {
         loadSensorData();
-    } else if (data.panel_id === 'disk_usage') {
-        loadDiskUsage();
+    } else if (data.panel_id === 'device_health') {
+        loadDeviceHealth();
     }
 }
 
@@ -189,9 +218,9 @@ function resizeAllCharts() {
             liveChart.resize();
             liveChart.update('none');
         }
-        if (diskChart) {
-            diskChart.resize();
-            diskChart.update('none');
+        if (healthChart) {
+            healthChart.resize();
+            healthChart.update('none');
         }
     }, 150);
 }
@@ -343,63 +372,41 @@ function initializeCharts() {
         });
     }
     
-    // Storage Monitor Chart (horizontal stacked bar: used vs free per path)
-    const diskChartCanvas = document.getElementById('diskChart');
-    if (diskChartCanvas) {
-        const ctx = diskChartCanvas.getContext('2d');
-        diskChart = new Chart(ctx, {
+    // Device Health Chart
+    const healthChartCanvas = document.getElementById('healthChart');
+    if (healthChartCanvas) {
+        const ctx = healthChartCanvas.getContext('2d');
+        healthChart = new Chart(ctx, {
             type: 'bar',
             data: {
                 labels: [],
-                datasets: [
-                    {
-                        label: 'Used (GB)',
-                        data: [],
-                        backgroundColor: COLORS.miamiRed,
-                        borderColor: COLORS.miamiRed,
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Free (GB)',
-                        data: [],
-                        backgroundColor: COLORS.lightGray,
-                        borderColor: COLORS.lightGray,
-                        borderWidth: 1
-                    }
-                ]
+                datasets: [{
+                    label: 'Latest Value',
+                    data: [],
+                    backgroundColor: COLORS.miamiRed,
+                    borderColor: COLORS.miamiRed,
+                    borderWidth: 1
+                }]
             },
             options: {
-                indexAxis: 'y',
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'bottom',
-                        labels: { usePointStyle: true, boxWidth: 6 }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const row = diskChart.data.labels[context.dataIndex];
-                                const extra = context.dataset.label === 'Used (GB)'
-                                    ? ` (${context.chart.data.datasets[0].data[context.dataIndex] /
-                                        (context.chart.data.datasets[0].data[context.dataIndex] +
-                                         context.chart.data.datasets[1].data[context.dataIndex]) * 100 || 0).toFixed(1)}%)`
-                                    : '';
-                                return ` ${context.dataset.label}: ${context.parsed.x.toFixed(1)} GB${extra}`;
-                            }
-                        }
+                        display: false
                     }
                 },
                 scales: {
                     x: {
-                        stacked: true,
-                        grid: { color: COLORS.lightGray },
-                        title: { display: true, text: 'Gigabytes' }
+                        grid: {
+                            display: false
+                        }
                     },
                     y: {
-                        stacked: true,
-                        grid: { display: false }
+                        grid: {
+                            color: COLORS.lightGray
+                        },
+                        beginAtZero: true
                     }
                 }
             }
@@ -415,7 +422,7 @@ async function loadAllData() {
         loadSensorData(),
         loadKPIs(),
         loadHistoricalLogs(),
-        loadDiskUsage()
+        loadDeviceHealth()
     ]);
 }
 
@@ -431,23 +438,16 @@ function refreshData() {
  */
 async function loadSensorData() {
     if (!liveChart) return;
-
-    const noData = document.getElementById('live-no-data');
-
+    
     try {
         const response = await fetch('/api/sensor-data?hours=1&limit=100');
         const data = await response.json();
-
+        
         if (data.length === 0) {
-            liveChart.data.labels = [];
-            liveChart.data.datasets = [];
-            liveChart.update('none');
-            if (noData) noData.classList.add('visible');
             return;
         }
-
-        if (noData) noData.classList.remove('visible');
-
+        
+        // Group data by sensor
         const sensorGroups = {};
         data.forEach(item => {
             if (!sensorGroups[item.sensor_name]) {
@@ -455,17 +455,19 @@ async function loadSensorData() {
             }
             sensorGroups[item.sensor_name].push(item);
         });
-
+        
+        // Get unique timestamps
         const timestamps = [...new Set(data.map(d => d.timestamp))].sort();
         const labels = timestamps.map(t => {
             const date = new Date(t);
-            return date.toLocaleTimeString('en-US', {
-                hour: '2-digit',
+            return date.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
                 minute: '2-digit',
                 second: '2-digit'
             });
         });
-
+        
+        // Create datasets
         const colors = [COLORS.miamiRed, '#1D4ED8', '#059669', '#7C3AED', '#D97706'];
         const datasets = Object.keys(sensorGroups).map((sensorName, index) => {
             const sensorData = sensorGroups[sensorName];
@@ -473,7 +475,7 @@ async function loadSensorData() {
                 const point = sensorData.find(d => d.timestamp === timestamp);
                 return point ? point.value : null;
             });
-
+            
             return {
                 label: sensorName,
                 data: values,
@@ -485,11 +487,11 @@ async function loadSensorData() {
                 pointRadius: 2
             };
         });
-
+        
         liveChart.data.labels = labels;
         liveChart.data.datasets = datasets;
         liveChart.update('none');
-
+        
     } catch (error) {
         console.error('Error loading sensor data:', error);
     }
@@ -561,34 +563,34 @@ async function loadHistoricalLogs() {
 }
 
 /**
- * Load disk usage for the Storage Monitor panel
+ * Load device health data for the bar chart
  */
-async function loadDiskUsage() {
-    if (!diskChart) return;
-
-    const noData = document.getElementById('disk-no-data');
-
+async function loadDeviceHealth() {
+    if (!healthChart) return;
+    
     try {
-        const response = await fetch('/api/disk-usage');
-        if (!response.ok) {
-            if (noData) noData.classList.add('visible');
-            return;
-        }
+        const response = await fetch('/api/sensor-data/latest');
         const data = await response.json();
-        const valid = data.filter(d => !d.error);
-        if (!valid.length) {
-            if (noData) noData.classList.add('visible');
+        
+        if (data.length === 0) {
             return;
         }
-
-        if (noData) noData.classList.remove('visible');
-        diskChart.data.labels = valid.map(d => d.label);
-        diskChart.data.datasets[0].data = valid.map(d => d.used_gb);
-        diskChart.data.datasets[1].data = valid.map(d => d.free_gb);
-        diskChart.update('none');
+        
+        const labels = data.map(d => d.sensor_name);
+        const values = data.map(d => d.value);
+        const colors = data.map(d => 
+            d.status === 'OK' ? COLORS.success : 
+            d.status === 'WARNING' ? COLORS.warning : COLORS.miamiRed
+        );
+        
+        healthChart.data.labels = labels;
+        healthChart.data.datasets[0].data = values;
+        healthChart.data.datasets[0].backgroundColor = colors;
+        healthChart.data.datasets[0].borderColor = colors;
+        healthChart.update('none');
+        
     } catch (error) {
-        if (noData) noData.classList.add('visible');
-        console.error('Error loading disk usage:', error);
+        console.error('Error loading device health:', error);
     }
 }
 

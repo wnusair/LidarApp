@@ -137,23 +137,6 @@
 .fullscreen-overlay.active {
     display: block;
 }
-
-.chart-no-data {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    color: var(--academic-gray);
-    font-size: 0.875rem;
-}
-
-.chart-no-data.visible {
-    display: flex;
-}
 </style>
 {% endblock %}
 
@@ -198,7 +181,6 @@
                 {% if panel_access.panel_1 %}
                 <div class="chart-container">
                     <canvas id="liveChart"></canvas>
-                    <div class="chart-no-data visible" id="live-no-data">Waiting for sensor data&hellip;</div>
                 </div>
                 {% else %}
                 <div class="restricted-overlay">
@@ -283,7 +265,7 @@
 
         <div class="panel" id="panel-4">
             <div class="panel-header">
-                <h2 class="panel-title">Storage Monitor</h2>
+                <h2 class="panel-title">Device Health</h2>
                 <div class="panel-actions">
                     <button class="panel-btn" onclick="toggleFullscreen('panel-4')" title="Fullscreen">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -295,8 +277,7 @@
             <div class="panel-body">
                 {% if panel_access.panel_4 %}
                 <div class="chart-container">
-                    <canvas id="diskChart"></canvas>
-                    <div class="chart-no-data visible" id="disk-no-data">No storage data available</div>
+                    <canvas id="healthChart"></canvas>
                 </div>
                 {% else %}
                 <div class="restricted-overlay">

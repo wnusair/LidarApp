@@ -15,10 +15,8 @@ class RolePermission(db.Model):
     can_view_panel_1 = db.Column(db.Boolean, default=True)   # Live Sensor Feed
     can_view_panel_2 = db.Column(db.Boolean, default=True)   # Current Status/KPIs
     can_view_panel_3 = db.Column(db.Boolean, default=False)  # Historical Logs
-    can_view_panel_4 = db.Column(db.Boolean, default=False)  # Storage Monitor
+    can_view_panel_4 = db.Column(db.Boolean, default=False)  # Device Health
     
-    can_view_panel_5 = db.Column(db.Boolean, default=False)  # Storage Monitor
-
     # Action Permissions
     can_export_data = db.Column(db.Boolean, default=False)   # Download .XLSX
     can_edit_data = db.Column(db.Boolean, default=False)     # Write controls (future)
@@ -65,7 +63,7 @@ DEFAULT_PERMISSIONS = {
         'can_export_data': True,    # Can export for auditing
         'can_edit_data': False,
         'can_manage_users': False,
-        'can_view_access_logs': True,
+        'can_view_access_logs': True,  # Can see access logs
     },
     'Operator': {
         'can_view_panel_1': True,
@@ -83,7 +81,7 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_3': True,
         'can_view_panel_4': True,
         'can_export_data': True,
-        'can_edit_data': True,
+        'can_edit_data': True,      # Can modify data
         'can_manage_users': False,
         'can_view_access_logs': False,
     },
@@ -94,7 +92,7 @@ DEFAULT_PERMISSIONS = {
         'can_view_panel_4': True,
         'can_export_data': True,
         'can_edit_data': True,
-        'can_manage_users': True,
+        'can_manage_users': True,   # Full admin access
         'can_view_access_logs': True,
     },
 }
