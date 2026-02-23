@@ -1,6 +1,7 @@
 """
 API routes for data export and sensor data ingestion.
 """
+import os
 from io import BytesIO
 from datetime import datetime, timezone, timedelta
 from flask import jsonify, request, send_file, abort, current_app

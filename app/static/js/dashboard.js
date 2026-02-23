@@ -29,7 +29,7 @@ let isCameraActive = false;
 let socket = null;
 
 // Update interval (milliseconds)
-const UPDATE_INTERVAL = 50;
+const UPDATE_INTERVAL = 5000;
 
 /**
  * Initialize the dashboard on page load
@@ -431,16 +431,23 @@ function refreshData() {
  */
 async function loadSensorData() {
     if (!liveChart) return;
-    
+
+    const noData = document.getElementById('live-no-data');
+
     try {
         const response = await fetch('/api/sensor-data?hours=1&limit=100');
         const data = await response.json();
-        
+
         if (data.length === 0) {
+            liveChart.data.labels = [];
+            liveChart.data.datasets = [];
+            liveChart.update('none');
+            if (noData) noData.classList.add('visible');
             return;
         }
-        
-        // Group data by sensor
+
+        if (noData) noData.classList.remove('visible');
+
         const sensorGroups = {};
         data.forEach(item => {
             if (!sensorGroups[item.sensor_name]) {
@@ -448,19 +455,17 @@ async function loadSensorData() {
             }
             sensorGroups[item.sensor_name].push(item);
         });
-        
-        // Get unique timestamps
+
         const timestamps = [...new Set(data.map(d => d.timestamp))].sort();
         const labels = timestamps.map(t => {
             const date = new Date(t);
-            return date.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
+            return date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
             });
         });
-        
-        // Create datasets
+
         const colors = [COLORS.miamiRed, '#1D4ED8', '#059669', '#7C3AED', '#D97706'];
         const datasets = Object.keys(sensorGroups).map((sensorName, index) => {
             const sensorData = sensorGroups[sensorName];
@@ -468,7 +473,7 @@ async function loadSensorData() {
                 const point = sensorData.find(d => d.timestamp === timestamp);
                 return point ? point.value : null;
             });
-            
+
             return {
                 label: sensorName,
                 data: values,
@@ -480,11 +485,11 @@ async function loadSensorData() {
                 pointRadius: 2
             };
         });
-        
+
         liveChart.data.labels = labels;
         liveChart.data.datasets = datasets;
         liveChart.update('none');
-        
+
     } catch (error) {
         console.error('Error loading sensor data:', error);
     }
@@ -560,18 +565,29 @@ async function loadHistoricalLogs() {
  */
 async function loadDiskUsage() {
     if (!diskChart) return;
+
+    const noData = document.getElementById('disk-no-data');
+
     try {
         const response = await fetch('/api/disk-usage');
-        if (!response.ok) return;
+        if (!response.ok) {
+            if (noData) noData.classList.add('visible');
+            return;
+        }
         const data = await response.json();
         const valid = data.filter(d => !d.error);
-        if (!valid.length) return;
+        if (!valid.length) {
+            if (noData) noData.classList.add('visible');
+            return;
+        }
 
+        if (noData) noData.classList.remove('visible');
         diskChart.data.labels = valid.map(d => d.label);
         diskChart.data.datasets[0].data = valid.map(d => d.used_gb);
         diskChart.data.datasets[1].data = valid.map(d => d.free_gb);
         diskChart.update('none');
     } catch (error) {
+        if (noData) noData.classList.add('visible');
         console.error('Error loading disk usage:', error);
     }
 }
