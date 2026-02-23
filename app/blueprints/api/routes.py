@@ -146,6 +146,15 @@ def export_xlsx():
     )
 
 
+@api_bp.route('/devices')
+@login_required
+def get_devices():
+    """Get list of distinct device IDs that have reported sensor data."""
+    rows = db.session.query(SensorData.device_id).distinct().all()
+    device_ids = sorted(set(r[0] or 'unknown' for r in rows))
+    return jsonify({'devices': device_ids, 'count': len(device_ids)})
+
+
 @api_bp.route('/ingest', methods=['POST'])
 def ingest_sensor_data():
     """Ingest sensor data from external sources."""
@@ -156,12 +165,16 @@ def ingest_sensor_data():
 
     items = data if isinstance(data, list) else [data]
 
+    # Top-level device_id provided at the batch level (optional).
+    batch_device_id = data.get('device_id', 'unknown') if isinstance(data, dict) else 'unknown'
+
     created = []
     for item in items:
         sensor_name = item.get('sensor_name')
         value = item.get('value')
         unit = item.get('unit', '')
         status = item.get('status', 'OK')
+        device_id = item.get('device_id', batch_device_id)
 
         if not sensor_name or value is None:
             continue
@@ -172,6 +185,7 @@ def ingest_sensor_data():
             continue
 
         sensor_data = SensorData(
+            device_id=device_id,
             sensor_name=sensor_name,
             value=value,
             unit=unit,
