@@ -189,9 +189,9 @@ function resizeAllCharts() {
             liveChart.resize();
             liveChart.update('none');
         }
-        if (healthChart) {
-            healthChart.resize();
-            healthChart.update('none');
+        if (diskChart) {
+            diskChart.resize();
+            diskChart.update('none');
         }
     }, 150);
 }
