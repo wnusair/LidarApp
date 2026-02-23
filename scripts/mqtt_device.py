@@ -32,7 +32,7 @@ MQTT_PASSWORD       Broker password            (optional)
 MQTT_USE_TLS        true/false                 (default false)
 MQTT_TLS_CA_CERTS   Path to CA cert bundle     (optional, uses system roots)
 MQTT_TOPIC_PREFIX   Topic prefix               (default devices)
-MQTT_INTERVAL       Seconds between readings   (default 1.0)
+MQTT_INTERVAL       Seconds between readings   (default 0.05 = 50 ms)
 MQTT_QOS            MQTT QoS level 0/1/2       (default 1)
 
 Sensor configuration
@@ -102,7 +102,7 @@ PASSWORD = os.environ.get('MQTT_PASSWORD')
 USE_TLS = os.environ.get('MQTT_USE_TLS', 'false').lower() == 'true'
 CA_CERTS = os.environ.get('MQTT_TLS_CA_CERTS')
 TOPIC_PREFIX = os.environ.get('MQTT_TOPIC_PREFIX', 'devices')
-INTERVAL = float(os.environ.get('MQTT_INTERVAL', 1.0))
+INTERVAL = float(os.environ.get('MQTT_INTERVAL', 0.05))
 QOS = int(os.environ.get('MQTT_QOS', 1))
 
 # Default port: 8883 when TLS enabled, 1883 otherwise

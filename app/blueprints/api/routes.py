@@ -3,7 +3,7 @@ API routes for data export and sensor data ingestion.
 """
 from io import BytesIO
 from datetime import datetime, timezone, timedelta
-from flask import jsonify, request, send_file, abort
+from flask import jsonify, request, send_file, abort, current_app
 from flask_login import login_required, current_user
 import pandas as pd
 from . import api_bp
@@ -153,6 +153,65 @@ def get_devices():
     rows = db.session.query(SensorData.device_id).distinct().all()
     device_ids = sorted(set(r[0] or 'unknown' for r in rows))
     return jsonify({'devices': device_ids, 'count': len(device_ids)})
+
+
+@api_bp.route('/disk-usage')
+@login_required
+def get_disk_usage():
+    """Return disk usage stats for the paths configured in DISK_MONITOR_PATHS.
+
+    Query params:
+        paths  – optional comma-separated override, e.g. /,/home,/data
+    """
+    import shutil
+    import subprocess
+    import platform
+
+    raw = request.args.get('paths', '')
+    if raw:
+        paths = [p.strip() for p in raw.split(',') if p.strip()]
+    else:
+        paths = current_app.config.get('DISK_MONITOR_PATHS', ['/'])
+
+    is_linux = platform.system() != 'Windows'
+    result = []
+
+    for path in paths:
+        if not os.path.exists(path):
+            result.append({'label': path, 'error': 'path not found'})
+            continue
+        try:
+            usage = shutil.disk_usage(path)
+            total_gb = round(usage.total / 1_000_000_000, 2)
+            used_gb  = round(usage.used  / 1_000_000_000, 2)
+            free_gb  = round(usage.free  / 1_000_000_000, 2)
+            pct      = round(usage.used / usage.total * 100, 1) if usage.total else 0
+        except OSError as exc:
+            result.append({'label': path, 'error': str(exc)})
+            continue
+
+        # Per-folder size via `du` (Linux/macOS only; falls back to None)
+        folder_gb = None
+        if is_linux:
+            try:
+                out = subprocess.check_output(
+                    ['du', '-sb', '--', path],
+                    stderr=subprocess.DEVNULL, timeout=5
+                )
+                folder_gb = round(int(out.split()[0]) / 1_000_000_000, 3)
+            except Exception:
+                pass
+
+        result.append({
+            'label':     path,
+            'total_gb':  total_gb,
+            'used_gb':   used_gb,
+            'free_gb':   free_gb,
+            'percent':   pct,
+            'folder_gb': folder_gb,
+        })
+
+    return jsonify(result)
 
 
 @api_bp.route('/ingest', methods=['POST'])

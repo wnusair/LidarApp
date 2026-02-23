@@ -287,6 +287,31 @@
                 {% endif %}
             </div>
         </div>
+
+        <div class="panel" id="panel-5">
+            <div class="panel-header">
+                <h2 class="panel-title">Storage Monitor</h2>
+                <div class="panel-actions">
+                    <button class="panel-btn" onclick="toggleFullscreen('panel-5')" title="Fullscreen">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="panel-body">
+                {% if panel_access.panel_5 %}
+                <div class="chart-container">
+                    <canvas id="diskChart"></canvas>
+                </div>
+                {% else %}
+                <div class="restricted-overlay">
+                    <span class="restricted-icon">Restricted</span>
+                    <p class="restricted-text">You do not have permission to view this panel</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 </div>
 
@@ -296,6 +321,7 @@
         canViewPanel2: {{ 'true' if panel_access.panel_2 else 'false' }},
         canViewPanel3: {{ 'true' if panel_access.panel_3 else 'false' }},
         canViewPanel4: {{ 'true' if panel_access.panel_4 else 'false' }},
+        canViewPanel5: {{ 'true' if panel_access.panel_5 else 'false' }},
         canExport: {{ 'true' if can_export else 'false' }},
         canEdit: {{ 'true' if can_edit else 'false' }}
     };

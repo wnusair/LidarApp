@@ -20,6 +20,7 @@ const COLORS = {
 // Chart instances
 let liveChart = null;
 let healthChart = null;
+let diskChart = null;
 
 // Camera state
 let cameraStream = null;
@@ -70,6 +71,74 @@ function initializeWebSocket() {
         
         socket.on('number_received', function(data) {
             console.log('Number received:', data.value);
+        });
+
+        // Real-time MQTT push: update charts immediately without waiting for the poll cycle
+        socket.on('sensor_data', function(data) {
+            if (!data.readings || !data.readings.length) return;
+
+            const MAX_POINTS = 100;
+            const colors = [COLORS.miamiRed, '#1D4ED8', '#059669', '#7C3AED', '#D97706'];
+            const now = new Date().toLocaleTimeString('en-US', {
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            });
+
+            if (liveChart) {
+                liveChart.data.labels.push(now);
+                if (liveChart.data.labels.length > MAX_POINTS) liveChart.data.labels.shift();
+
+                data.readings.forEach(function(reading) {
+                    let dataset = liveChart.data.datasets.find(function(d) {
+                        return d.label === reading.sensor_name;
+                    });
+                    if (!dataset) {
+                        const idx = liveChart.data.datasets.length;
+                        dataset = {
+                            label: reading.sensor_name,
+                            data: new Array(liveChart.data.labels.length - 1).fill(null),
+                            borderColor: colors[idx % colors.length],
+                            backgroundColor: colors[idx % colors.length] + '20',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.1,
+                            pointRadius: 2
+                        };
+                        liveChart.data.datasets.push(dataset);
+                    }
+                    dataset.data.push(reading.value);
+                    if (dataset.data.length > MAX_POINTS) dataset.data.shift();
+                });
+                liveChart.update('none');
+            }
+
+            if (healthChart) {
+                const bgColors = Array.isArray(healthChart.data.datasets[0].backgroundColor)
+                    ? healthChart.data.datasets[0].backgroundColor
+                    : [];
+                const bdColors = Array.isArray(healthChart.data.datasets[0].borderColor)
+                    ? healthChart.data.datasets[0].borderColor
+                    : [];
+
+                data.readings.forEach(function(reading) {
+                    const color = reading.status === 'OK' ? COLORS.success
+                        : reading.status === 'WARNING' ? COLORS.warning
+                        : COLORS.miamiRed;
+                    const idx = healthChart.data.labels.indexOf(reading.sensor_name);
+                    if (idx >= 0) {
+                        healthChart.data.datasets[0].data[idx] = reading.value;
+                        bgColors[idx] = color;
+                        bdColors[idx] = color;
+                    } else {
+                        healthChart.data.labels.push(reading.sensor_name);
+                        healthChart.data.datasets[0].data.push(reading.value);
+                        bgColors.push(color);
+                        bdColors.push(color);
+                    }
+                });
+                healthChart.data.datasets[0].backgroundColor = bgColors;
+                healthChart.data.datasets[0].borderColor = bdColors;
+                healthChart.update('none');
+            }
         });
     }
 }
@@ -304,6 +373,69 @@ function initializeCharts() {
         });
     }
     
+    // Storage Monitor Chart (horizontal stacked bar: used vs free per path)
+    const diskChartCanvas = document.getElementById('diskChart');
+    if (diskChartCanvas) {
+        const ctx = diskChartCanvas.getContext('2d');
+        diskChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'Used (GB)',
+                        data: [],
+                        backgroundColor: COLORS.miamiRed,
+                        borderColor: COLORS.miamiRed,
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Free (GB)',
+                        data: [],
+                        backgroundColor: COLORS.lightGray,
+                        borderColor: COLORS.lightGray,
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, boxWidth: 6 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const row = diskChart.data.labels[context.dataIndex];
+                                const extra = context.dataset.label === 'Used (GB)'
+                                    ? ` (${context.chart.data.datasets[0].data[context.dataIndex] /
+                                        (context.chart.data.datasets[0].data[context.dataIndex] +
+                                         context.chart.data.datasets[1].data[context.dataIndex]) * 100 || 0).toFixed(1)}%)`
+                                    : '';
+                                return ` ${context.dataset.label}: ${context.parsed.x.toFixed(1)} GB${extra}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { color: COLORS.lightGray },
+                        title: { display: true, text: 'Gigabytes' }
+                    },
+                    y: {
+                        stacked: true,
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
     // Device Health Chart
     const healthChartCanvas = document.getElementById('healthChart');
     if (healthChartCanvas) {
@@ -354,7 +486,8 @@ async function loadAllData() {
         loadSensorData(),
         loadKPIs(),
         loadHistoricalLogs(),
-        loadDeviceHealth()
+        loadDeviceHealth(),
+        loadDiskUsage()
     ]);
 }
 
@@ -523,6 +656,27 @@ async function loadDeviceHealth() {
         
     } catch (error) {
         console.error('Error loading device health:', error);
+    }
+}
+
+/**
+ * Load disk usage for the Storage Monitor panel
+ */
+async function loadDiskUsage() {
+    if (!diskChart) return;
+    try {
+        const response = await fetch('/api/disk-usage');
+        if (!response.ok) return;
+        const data = await response.json();
+        const valid = data.filter(d => !d.error);
+        if (!valid.length) return;
+
+        diskChart.data.labels = valid.map(d => d.label);
+        diskChart.data.datasets[0].data = valid.map(d => d.used_gb);
+        diskChart.data.datasets[1].data = valid.map(d => d.free_gb);
+        diskChart.update('none');
+    } catch (error) {
+        console.error('Error loading disk usage:', error);
     }
 }
 

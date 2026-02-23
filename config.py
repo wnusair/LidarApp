@@ -57,6 +57,15 @@ class Config:
     # Topic prefix – server subscribes to <prefix>/+/data.
     MQTT_DEVICE_TOPIC_PREFIX = os.environ.get('MQTT_DEVICE_TOPIC_PREFIX', 'devices')
 
+    # --- Disk usage monitoring (Storage Monitor panel) ---
+    # Comma-separated server paths shown in panel 5.
+    # Example: DISK_MONITOR_PATHS=/,/home,/var/log,/srv/app
+    DISK_MONITOR_PATHS = [
+        p.strip()
+        for p in os.environ.get('DISK_MONITOR_PATHS', '/').split(',')
+        if p.strip()
+    ]
+
 
 class DevelopmentConfig(Config):
     """Development configuration."""
